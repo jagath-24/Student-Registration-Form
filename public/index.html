@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student Registration</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Student Registration</h1>
+
+    <form id="regForm" novalidate>
+      <div class="form-group">
+        <label for="name">Full Name</label>
+        <input type="text" id="name" name="name" placeholder="John Doe" required minlength="2" />
+        <span class="error" id="nameErr"></span>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" placeholder="john@example.com" required />
+        <span class="error" id="emailErr"></span>
+      </div>
+
+      <div class="form-group">
+        <label for="dob">Date of Birth</label>
+        <input type="date" id="dob" name="dob" required />
+        <span class="error" id="dobErr"></span>
+      </div>
+
+      <div class="form-group">
+        <label for="department">Department</label>
+        <select id="department" name="department" required>
+          <option value="">-- Select Department --</option>
+          <option value="Computer Science">Computer Science</option>
+          <option value="Electronics">Electronics</option>
+          <option value="Mechanical">Mechanical</option>
+          <option value="Civil">Civil</option>
+          <option value="Mathematics">Mathematics</option>
+          <option value="Physics">Physics</option>
+        </select>
+        <span class="error" id="deptErr"></span>
+      </div>
+
+      <div class="form-group">
+        <label for="phone">Phone Number</label>
+        <input type="tel" id="phone" name="phone" placeholder="9876543210"
+               pattern="[0-9]{10}" maxlength="10" required />
+        <span class="error" id="phoneErr"></span>
+      </div>
+
+      <button type="submit" class="btn-submit">Register</button>
+      <p id="formMsg" class="form-msg"></p>
+    </form>
+
+    <div class="table-section">
+      <div class="table-header">
+        <h2>Registered Students</h2>
+        <button class="btn-load" onclick="loadStudents()">Refresh</button>
+      </div>
+      <div class="table-wrapper">
+        <table id="studentTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Date of Birth</th>
+              <th>Department</th>
+              <th>Phone</th>
+              <th>Registered On</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="7" class="empty">No records yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Validate and submit form
+    document.getElementById('regForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearErrors();
+
+      const name       = document.getElementById('name').value.trim();
+      const email      = document.getElementById('email').value.trim();
+      const dob        = document.getElementById('dob').value;
+      const department = document.getElementById('department').value;
+      const phone      = document.getElementById('phone').value.trim();
+
+      let valid = true;
+
+      if (name.length < 2) {
+        showError('nameErr', 'Name must be at least 2 characters.'); valid = false;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showError('emailErr', 'Enter a valid email address.'); valid = false;
+      }
+      if (!dob) {
+        showError('dobErr', 'Date of birth is required.'); valid = false;
+      } else if (new Date(dob) >= new Date()) {
+        showError('dobErr', 'Date of birth must be in the past.'); valid = false;
+      }
+      if (!department) {
+        showError('deptErr', 'Please select a department.'); valid = false;
+      }
+      if (!/^\d{10}$/.test(phone)) {
+        showError('phoneErr', 'Phone must be exactly 10 digits.'); valid = false;
+      }
+
+      if (!valid) return;
+
+      try {
+        const res = await fetch('/api/students', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, dob, department, phone })
+        });
+        const data = await res.json();
+        const msg = document.getElementById('formMsg');
+
+        if (res.ok) {
+          msg.textContent = 'Student registered successfully!';
+          msg.className = 'form-msg success';
+          document.getElementById('regForm').reset();
+          loadStudents();
+        } else {
+          msg.textContent = data.error || 'Registration failed.';
+          msg.className = 'form-msg error-msg';
+        }
+      } catch {
+        document.getElementById('formMsg').textContent = 'Server error. Please try again.';
+      }
+    });
+
+    function showError(id, msg) {
+      document.getElementById(id).textContent = msg;
+    }
+
+    function clearErrors() {
+      ['nameErr','emailErr','dobErr','deptErr','phoneErr'].forEach(id => {
+        document.getElementById(id).textContent = '';
+      });
+      document.getElementById('formMsg').textContent = '';
+    }
+
+    // SELECT — load students from DB
+    async function loadStudents() {
+      const res = await fetch('/api/students');
+      const students = await res.json();
+      const tbody = document.getElementById('tableBody');
+
+      if (!students.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">No records yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = students.map((s, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${escape(s.name)}</td>
+          <td>${escape(s.email)}</td>
+          <td>${s.dob}</td>
+          <td>${escape(s.department)}</td>
+          <td>${escape(s.phone)}</td>
+          <td>${new Date(s.created_at).toLocaleDateString()}</td>
+        </tr>
+      `).join('');
+    }
+
+    function escape(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // Load on page open
+    loadStudents();
+  </script>
+</body>
+</html>
